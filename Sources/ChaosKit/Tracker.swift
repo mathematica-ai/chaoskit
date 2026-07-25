@@ -392,6 +392,7 @@ public final class ChaosTracker: @unchecked Sendable {
             queue.removeFirst(n)
         }
         let base = config.apiBase
+        let key = config.apiKey
         let intent = currentIntent.rawValue
         let vid = visitorId
         let sid = sessionId
@@ -399,7 +400,15 @@ public final class ChaosTracker: @unchecked Sendable {
 
         for batch in batches {
             do {
-                try await sendBatch(batch, apiBase: base, intent: intent, visitorId: vid, sessionId: sid, siteId: site)
+                try await sendBatch(
+                    batch,
+                    apiBase: base,
+                    apiKey: key,
+                    intent: intent,
+                    visitorId: vid,
+                    sessionId: sid,
+                    siteId: site
+                )
             } catch {
                 var p = loadPending()
                 p.append(contentsOf: batch)
@@ -666,6 +675,7 @@ public final class ChaosTracker: @unchecked Sendable {
     private func sendBatch(
         _ batch: [ChaosEvent],
         apiBase: String,
+        apiKey: String?,
         intent: String,
         visitorId: String,
         sessionId: String,
@@ -686,6 +696,9 @@ public final class ChaosTracker: @unchecked Sendable {
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let apiKey, !apiKey.isEmpty {
+            req.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        }
         req.httpBody = try JSONEncoder().encode(
             Body(batch: batch, intent: intent, visitor_id: visitorId,
                  session_id: sessionId, site_id: siteId)

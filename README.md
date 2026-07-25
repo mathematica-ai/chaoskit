@@ -78,6 +78,7 @@ ChaosTracker.shared.optOut()
 |--------|---------|--------|
 | `siteId` | `nil` | App / product id on every event |
 | `apiBase` | `https://ap1.mathematica.ai/api/v1/intent` | Must be absolute on device |
+| `apiKey` | `nil` | Optional `Authorization: Bearer` on `/ingest` |
 | `localIntentOnly` | `false` | **Recommended** for on-device photo apps — no raw click stream |
 | `samplingRate` | `1` | Per-visitor 0…1 |
 | `hasConsent` | `nil` | Return `false` to block init; `optOut()` always wins |

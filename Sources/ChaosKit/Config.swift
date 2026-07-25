@@ -33,6 +33,8 @@ public struct ChaosConfig: Sendable {
     public var siteId: String?
     /// Absolute base URL, e.g. `https://ap1.mathematica.ai/api/v1/intent`
     public var apiBase: String
+    /// Optional write key — sent as `Authorization: Bearer …` on `/ingest`.
+    public var apiKey: String?
     public var hasConsent: (@Sendable (ChaosPrivacySignals) -> Bool)?
     public var hashIdentifiers: Bool
     public var hashFields: [String]
@@ -46,6 +48,7 @@ public struct ChaosConfig: Sendable {
     public init(
         siteId: String? = nil,
         apiBase: String = "https://ap1.mathematica.ai/api/v1/intent",
+        apiKey: String? = nil,
         hasConsent: (@Sendable (ChaosPrivacySignals) -> Bool)? = nil,
         hashIdentifiers: Bool = false,
         hashFields: [String] = ["email", "name", "phone"],
@@ -57,6 +60,7 @@ public struct ChaosConfig: Sendable {
     ) {
         self.siteId = siteId
         self.apiBase = apiBase
+        self.apiKey = apiKey
         self.hasConsent = hasConsent
         self.hashIdentifiers = hashIdentifiers
         self.hashFields = hashFields
