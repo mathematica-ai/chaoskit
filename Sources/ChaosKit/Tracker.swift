@@ -171,20 +171,33 @@ public final class ChaosTracker: @unchecked Sendable {
         stopped = false
         active = true
 
+        // Assessed ONCE. This previously called ChaosBot.assess three times to fill
+        // three fields of one object — triple the work, and three independent
+        // results describing what is meant to be a single verdict.
+        let botAssessment = ChaosBot.assess(userAgent: config.userAgent)
         var device: [String: ChaosJSON] = [
             "platform": .string("ios"),
             "bot_assessment": .object([
-                "flags": .object(ChaosBot.assess(userAgent: config.userAgent).flags.mapValues { .bool($0) }),
-                "score": .number(Double(ChaosBot.assess(userAgent: config.userAgent).score)),
-                "is_likely_bot": .bool(ChaosBot.assess(userAgent: config.userAgent).isLikelyBot),
+                "flags": .object(botAssessment.flags.mapValues { .bool($0) }),
+                "score": .number(Double(botAssessment.score)),
+                "is_likely_bot": .bool(botAssessment.isLikelyBot),
             ]),
         ]
         if let ua = config.userAgent {
             device["user_agent"] = .string(ua)
         }
 #if canImport(UIKit)
-        device["model"] = .string(UIDevice.current.model)
-        device["system_version"] = .string(UIDevice.current.systemVersion)
+        // `UIDevice.current` is @MainActor-isolated, so reading it from this
+        // non-isolated async context needs an actor hop — unmarked it is a
+        // warning today and an error under the Swift 6 language mode.
+        // Both fields are read in ONE hop rather than awaiting twice: two
+        // suspensions to fetch two constants is a needless round trip, and it
+        // also guarantees the pair describes a single consistent observation.
+        let deviceIdentity = await MainActor.run {
+            (model: UIDevice.current.model, systemVersion: UIDevice.current.systemVersion)
+        }
+        device["model"] = .string(deviceIdentity.model)
+        device["system_version"] = .string(deviceIdentity.systemVersion)
 #endif
 
         enqueue("session_start", data: [
