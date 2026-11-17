@@ -3,15 +3,39 @@ import Foundation
 // MARK: - Tunables (parity with p1-chaos-data/src/core.js)
 
 public enum ChaosCore {
-    public static let flushIntervalMs: TimeInterval = 5
-    public static let heartbeatMs: TimeInterval = 10
-    public static let idleTimeoutMs: TimeInterval = 30
+    // All durations are **seconds** (`TimeInterval`). The JS tracker keeps the
+    // same tunables in milliseconds; the old `…Ms` names below were a literal
+    // port of those identifiers and are kept only as deprecated aliases.
+    public static let flushInterval: TimeInterval = 5
+    public static let heartbeatInterval: TimeInterval = 10
+    /// Reserved: idle detection is not implemented on native.
+    public static let idleTimeout: TimeInterval = 30
+    public static let sessionTTL: TimeInterval = 30 * 60
+    public static let intentHalfLife: TimeInterval = 3 * 60
+    public static let intentProfileMaxAge: TimeInterval = 7 * 24 * 60 * 60
+    public static let backgroundAbandonThreshold: TimeInterval = 45
+    /// Minimum gap between writes that refresh the stored session timestamp.
+    public static let sessionTouchInterval: TimeInterval = 30
+    /// Flush retry backoff: `flushInterval * 2^(failures-1)`, capped here.
+    public static let maxFlushBackoff: TimeInterval = 5 * 60
+
+    @available(*, deprecated, renamed: "flushInterval", message: "Value is seconds, not milliseconds.")
+    public static var flushIntervalMs: TimeInterval { flushInterval }
+    @available(*, deprecated, renamed: "heartbeatInterval", message: "Value is seconds, not milliseconds.")
+    public static var heartbeatMs: TimeInterval { heartbeatInterval }
+    @available(*, deprecated, renamed: "idleTimeout", message: "Value is seconds, not milliseconds.")
+    public static var idleTimeoutMs: TimeInterval { idleTimeout }
+    @available(*, deprecated, renamed: "sessionTTL", message: "Value is seconds, not milliseconds.")
+    public static var sessionTTLMs: TimeInterval { sessionTTL }
+    @available(*, deprecated, renamed: "intentHalfLife", message: "Value is seconds, not milliseconds.")
+    public static var intentHalfLifeMs: TimeInterval { intentHalfLife }
+    @available(*, deprecated, renamed: "intentProfileMaxAge", message: "Value is seconds, not milliseconds.")
+    public static var intentProfileMaxAgeMs: TimeInterval { intentProfileMaxAge }
+    @available(*, deprecated, renamed: "backgroundAbandonThreshold", message: "Value is seconds, not milliseconds.")
+    public static var blurAbandonThresholdMs: TimeInterval { backgroundAbandonThreshold }
+
     public static let maxBatchSize = 50
     public static let maxPendingBufferSize = 100
-    public static let sessionTTLMs: TimeInterval = 30 * 60
-    public static let intentHalfLifeMs: TimeInterval = 3 * 60
-    public static let intentProfileMaxAgeMs: TimeInterval = 7 * 24 * 60 * 60
-    public static let blurAbandonThresholdMs: TimeInterval = 45
     public static let engagedComponentsThreshold = 3
 
     public static let pendingBufferKey = "chaos_pending"
@@ -141,20 +165,22 @@ public enum ChaosScreen {
         return out.replacingOccurrences(of: " ", with: "_")
     }
 
+    /// Compiled once — `classify` runs several times per tracked event.
+    private static let rules: [(ScreenType, NSRegularExpression)] = [
+        (.pricing, try! NSRegularExpression(pattern: #"^\/(pricing|plans|packages)(_|$)"#)),
+        (.checkout, try! NSRegularExpression(pattern: #"^\/(checkout|cart|payment|buy)(_|$)"#)),
+        (.demo, try! NSRegularExpression(pattern: #"^\/(demo|trial|signup|register)(_|$)"#)),
+        (.faq, try! NSRegularExpression(pattern: #"^\/(faq|help|support)(_|$)"#)),
+        (.caseStudy, try! NSRegularExpression(pattern: #"^\/(case_stud|success_stor|customer)"#)),
+        (.blog, try! NSRegularExpression(pattern: #"^\/(blog|article|post|news)(_|$)"#)),
+        (.comparison, try! NSRegularExpression(pattern: #"^\/(compare|comparison|alternative)(_|$)"#)),
+        (.home, try! NSRegularExpression(pattern: #"^\/(home|landing)(_|$)"#)),
+        (.feature, try! NSRegularExpression(pattern: #"^\/(feature|product|solution)(_|$)"#)),
+    ]
+
     public static func classify(_ screen: String?) -> ScreenType {
         guard let screen, !screen.isEmpty else { return .other }
         let n = normalize(screen)
-        let rules: [(ScreenType, NSRegularExpression)] = [
-            (.pricing, try! NSRegularExpression(pattern: #"^\/(pricing|plans|packages)(_|$)"#)),
-            (.checkout, try! NSRegularExpression(pattern: #"^\/(checkout|cart|payment|buy)(_|$)"#)),
-            (.demo, try! NSRegularExpression(pattern: #"^\/(demo|trial|signup|register)(_|$)"#)),
-            (.faq, try! NSRegularExpression(pattern: #"^\/(faq|help|support)(_|$)"#)),
-            (.caseStudy, try! NSRegularExpression(pattern: #"^\/(case_stud|success_stor|customer)"#)),
-            (.blog, try! NSRegularExpression(pattern: #"^\/(blog|article|post|news)(_|$)"#)),
-            (.comparison, try! NSRegularExpression(pattern: #"^\/(compare|comparison|alternative)(_|$)"#)),
-            (.home, try! NSRegularExpression(pattern: #"^\/(home|landing)(_|$)"#)),
-            (.feature, try! NSRegularExpression(pattern: #"^\/(feature|product|solution)(_|$)"#)),
-        ]
         let range = NSRange(n.startIndex..., in: n)
         for (type, re) in rules {
             if re.firstMatch(in: n, range: range) != nil { return type }
@@ -230,7 +256,8 @@ public enum ChaosIntent {
         firedSignals: Set<String>,
         firedAt: [String: Date] = [:],
         now: Date = Date(),
-        halfLifeMs: TimeInterval = ChaosCore.intentHalfLifeMs,
+        // Seconds, despite the label (kept for source compatibility).
+        halfLifeMs: TimeInterval = ChaosCore.intentHalfLife,
         priorScores: [IntentStage: Double]? = nil
     ) -> IntentResult {
         var scores: [IntentStage: Double] = [:]

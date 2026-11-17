@@ -1,0 +1,39 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ["v*"]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      # A release tag must match the version the package reports at runtime.
+      - name: Version matches tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          code="$(sed -nE 's/.*static let version = "([^"]+)".*/\1/p' Sources/ChaosKit/ChaosKit.swift)"
+          if [ "$tag" != "$code" ]; then
+            echo "::error::tag v$tag does not match ChaosKitModule.version $code"
+            exit 1
+          fi
+          grep -q "^## \[$code\]" CHANGELOG.md || { echo "::error::CHANGELOG.md has no entry for $code"; exit 1; }
+
+      - name: Build
+        run: swift build
+
+      - name: Test
+        run: swift test
+
+      - name: Test (thread sanitizer)
+        run: swift test --sanitize=thread

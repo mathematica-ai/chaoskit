@@ -1,3 +1,5 @@
+import Foundation
+
 /// ChaosKit — native iOS / Swift port of Mathematica **p1-chaos-tracker** (native adapter).
 ///
 /// Intent-aware, privacy-conscious product analytics for SwiftUI and UIKit apps.
@@ -18,5 +20,10 @@
 /// }
 /// ```
 public enum ChaosKitModule {
-    public static let version = "0.1.1"
+    public static let version = "0.2.0"
+
+    /// The bundled privacy manifest (UserDefaults required-reason declaration).
+    static var privacyManifestURL: URL? {
+        Bundle.module.url(forResource: "PrivacyInfo", withExtension: "xcprivacy")
+    }
 }

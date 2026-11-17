@@ -13,7 +13,11 @@ let package = Package(
         .library(name: "ChaosKit", targets: ["ChaosKit"]),
     ],
     targets: [
-        .target(name: "ChaosKit", path: "Sources/ChaosKit"),
+        .target(
+            name: "ChaosKit",
+            path: "Sources/ChaosKit",
+            resources: [.copy("PrivacyInfo.xcprivacy")]
+        ),
         .testTarget(
             name: "ChaosKitTests",
             dependencies: ["ChaosKit"],

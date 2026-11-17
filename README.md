@@ -32,7 +32,7 @@ git@github.com-math:mathematica-ai/chaoskit.git
 
 ```swift
 dependencies: [
-  .package(url: "git@github.com-math:mathematica-ai/chaoskit.git", from: "0.1.0"),
+  .package(url: "git@github.com-math:mathematica-ai/chaoskit.git", from: "0.2.0"),
 ],
 targets: [
   .target(name: "YourApp", dependencies: ["ChaosKit"]),
@@ -62,7 +62,7 @@ ChaosTracker.shared.trackScreen("Live")
 ChaosTracker.shared.trackPress("shutter_photo")
 ChaosTracker.shared.trackForm("lead", action: .start)
 
-// Optional traits (PII dropped if hashIdentifiers without crypto polyfill)
+// Optional traits (with hashIdentifiers, fields in hashFields are sent as SHA-256 hex)
 ChaosTracker.shared.identify(["plan": "b2b_demo"])
 
 // Force upload
@@ -82,6 +82,7 @@ ChaosTracker.shared.optOut()
 | `localIntentOnly` | `false` | **Recommended** for on-device photo apps — no raw click stream |
 | `samplingRate` | `1` | Per-visitor 0…1 |
 | `hasConsent` | `nil` | Return `false` to block init; `optOut()` always wins |
+| `hashIdentifiers` | `false` | `identify` traits named in `hashFields` (`email`, `name`, `phone`) are sent as SHA-256 hex, same scheme as the JS tracker |
 | `initialAttribution` | `nil` | UTM / install source at launch |
 
 ## Privacy
@@ -89,7 +90,38 @@ ChaosTracker.shared.optOut()
 - Visitor / session ids are random `ct_…` values in `UserDefaults` (not IDFA).
 - `localIntentOnly: true` sends only `intent_snapshot` (+ `identify`), not full behavioral streams.
 - No photo or camera content is ever attached by this SDK.
+- Ships a `PrivacyInfo.xcprivacy` (UserDefaults reason `CA92.1`; product-interaction analytics, not linked, no tracking).
 - Pair with product privacy policy; for P1(vision) support contact **info@mathematica.ai**.
+
+## Delivery and sessions
+
+- Events are flushed every 5 s, on backgrounding, and on `flush()`.
+- Anything being uploaded stays in a persisted buffer (max 100 events) until
+  the server acknowledges it.
+- Network errors, 5xx, 408 and 429 are retried with exponential backoff
+  (5 s → 5 min) on the periodic timer; `flush()` and the background flush always
+  try immediately. Other 4xx responses drop the batch (e.g. a bad `apiKey`).
+- A session ends after 30 minutes without activity. Activity refreshes the
+  stored session; returning to the foreground after the TTL closes the old
+  session (`session_end`, reason `ttl_expired_on_resume`) and opens a new one.
+- A 10 s heartbeat re-evaluates dwell-time signals. With `localIntentOnly` it
+  sends an `intent_snapshot` only when the stage or fired signals changed.
+
+## Thread safety
+
+`ChaosTracker` can be called from any thread. All state is guarded by one
+lock, and flushes are single-flight. A custom `ChaosStoring` must not call back
+into the tracker from `get` / `set` / `remove`.
+
+## Differences from the JS native adapter
+
+- `session_end` for an expired session carries the **expired** session id (JS
+  sends the new one).
+- `homepage_under_20s` fires when Home is left within 20 s, not on view.
+- Session rotation on resume is based on inactivity, not session age, and is
+  followed by a `session_start`.
+- Retry backoff and 4xx dropping (JS re-queues every failure).
+- `allowLocalhost` has no effect; idle detection is not implemented.
 
 ## Relation to p1-chaos-data
 
@@ -105,6 +137,7 @@ ChaosTracker.shared.optOut()
 ```bash
 cd chaoskit
 swift test
+swift test --sanitize=thread   # data-race check; also run in CI
 ```
 
 ## License
