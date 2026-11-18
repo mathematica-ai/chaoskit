@@ -23,7 +23,7 @@ Wire format matches `POST {apiBase}/ingest` (see p1-chaos-data `BACKEND_EVENT_SC
 **File → Add Package Dependencies…**
 
 ```
-git@github.com-math:mathematica-ai/chaoskit.git
+https://github.com/mathematica-ai/chaoskit.git
 ```
 
 (or `https://github.com/mathematica-ai/chaoskit.git`)
@@ -32,7 +32,7 @@ git@github.com-math:mathematica-ai/chaoskit.git
 
 ```swift
 dependencies: [
-  .package(url: "git@github.com-math:mathematica-ai/chaoskit.git", from: "0.2.0"),
+  .package(url: "https://github.com/mathematica-ai/chaoskit.git", from: "0.2.0"),
 ],
 targets: [
   .target(name: "YourApp", dependencies: ["ChaosKit"]),

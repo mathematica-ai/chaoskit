@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.2.0] - Unreleased
+## [0.2.0] - 2026-11-18
 
 ### Fixed
 - **Thread safety.** All tracker state is now guarded by one lock; `flush()`,
